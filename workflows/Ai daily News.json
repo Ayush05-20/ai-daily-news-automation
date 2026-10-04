@@ -1,0 +1,506 @@
+{
+  "name": "Ai daily News",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        256
+      ],
+      "id": "ed04e928-2ebb-4fb9-85fd-d4db10571ce9",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "https://techcrunch.com/category/artificial-intelligence/feed/",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        256
+      ],
+      "id": "30ded763-225b-467f-bbb7-e47c26a90fff",
+      "name": "RSS TechCrunch"
+    },
+    {
+      "parameters": {
+        "url": "https://arstechnica.com/ai/feed/",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        448
+      ],
+      "id": "34684724-3c11-4ee4-9261-18e598315d63",
+      "name": "RSS ARS"
+    },
+    {
+      "parameters": {
+        "url": "https://www.wired.com/feed/category/artificial-intelligence/rss",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        64
+      ],
+      "id": "a536dec1-d249-4b3c-bb68-5f698c37ca40",
+      "name": "RSS Verge"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        448,
+        240
+      ],
+      "id": "18fa99dc-e139-457a-824e-c20c01e5df47",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3ae32458-57fa-4987-bf61-f599065829a0",
+              "name": "title",
+              "value": "={{ $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "4c5b955f-cc7b-41ba-8116-bd587a660bd0",
+              "name": "url",
+              "value": "={{ $json.link }}",
+              "type": "string"
+            },
+            {
+              "id": "19f2de7c-7955-4835-8dd6-2078290c6286",
+              "name": "published",
+              "value": "={{ $json.isoDate || new Date($json.pubDate).toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "3c0e0675-7cf3-4e2a-8b9d-84d4936a2c37",
+              "name": "snippet",
+              "value": "={{ ($json.contentSnippet || $json.content || '').replace(/<[^>]*>/g, '').slice(0, 500) }}",
+              "type": "string"
+            },
+            {
+              "id": "c6bb98fd-2df7-4f50-815a-e713d212ad99",
+              "name": "source",
+              "value": "={{ $json.link.split('/')[2].replace('www.', '') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        672,
+        240
+      ],
+      "id": "e64e9e0c-79fc-4de3-9f06-d5dcd152abae",
+      "name": "Normalize"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "dd711e38-fe2c-4d25-901c-bbec0b0e459c",
+              "leftValue": "={{ $json.published }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "a49bb61e-60f0-42f9-a672-2f5d09ec1b6b",
+              "leftValue": "={{ $json.published }}",
+              "rightValue": "={{ $now.minus({ hours: 72 }).toISO() }}",
+              "operator": {
+                "type": "dateTime",
+                "operation": "after"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        896,
+        240
+      ],
+      "id": "9c6e7f95-7779-44bd-b99d-253ec7d8195e",
+      "name": "Filter"
+    },
+    {
+      "parameters": {
+        "compare": "selectedFields",
+        "fieldsToCompare": "=url",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        240
+      ],
+      "id": "ee6728a5-bdc0-4f10-8a4c-ed5530fe09ed",
+      "name": "Dedupe by URL"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "models/gemini-3-flash-preview"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.prompt }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        1936,
+        240
+      ],
+      "id": "723adbec-0fec-41c1-ad98-9d8e533ecac3",
+      "name": "Message a model",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "vJe6SZZt9yLsCBwu",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the AI's text answer (join all parts that contain text)\nconst raw = $input.first().json.content.parts\n  .map(p => p.text || '')\n  .join('');\n\n// 2. Remove markdown fences if the model added any, then parse\nconst cleaned = raw.replace(/```json|```/g, '').trim();\n\nlet data;\ntry {\n  data = JSON.parse(cleaned);\n} catch (e) {\n  throw new Error('AI returned invalid JSON: ' + cleaned.slice(0, 200));\n}\n\n// 3. Look up the real article data by ID\nconst originals = $('Top 15').all();\nconst seen = new Set();\nconst results = [];\n\nfor (const a of data.articles || []) {\n  const original = originals[a.id - 1];\n  if (!original || seen.has(a.id)) continue; // unknown or repeated ID: skip\n  seen.add(a.id);\n\n  results.push({\n    json: {\n      headline: a.headline,\n      summary: a.summary,\n      why_it_matters: a.why_it_matters,\n      category: a.category,\n      importance: a.importance,\n      url: original.json.url,\n      source: original.json.source,\n      published: original.json.published,\n    },\n  });\n}\n\n// 4. Most important first\nresults.sort((x, y) => y.json.importance - x.json.importance);\n\nif (results.length === 0) {\n  throw new Error('No valid articles after parsing');\n}\n\nreturn results;;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2304,
+        240
+      ],
+      "id": "6f032638-e9a5-44f1-838c-61bfd578f0a1",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\n// Number each article and turn the list into text\nconst articlesText = items\n  .map((item, i) => `[${i + 1}] ${item.json.title} (${item.json.source})\\n${item.json.snippet}`)\n  .join('\\n\\n');\n\nconst prompt = `You are an editor writing a daily AI news digest.\nBelow are ${items.length} articles. Each starts with an ID in square brackets.\n\nRULES:\n- Use ONLY the information in the articles. Do not add facts, numbers, quotes or links that are not in the text.\n- If an article gives too little information, write a shorter summary instead of guessing.\n- Skip duplicate stories (keep the best version) and low-value items such as gossip or pure opinion.\n- Select the 8 most important stories.\n\nFor each selected story return:\n- id: the article's ID number, exactly as given\n- headline: at most 12 words\n- summary: 1 to 2 plain sentences\n- why_it_matters: 1 sentence\n- category: one of LLMs, Agents, Robotics, Startups & Funding, Research, Policy & Safety, Products, Other\n- importance: a number from 1 (minor) to 5 (major)\n\nOUTPUT FORMAT: return ONLY valid JSON, with no markdown and no extra text, in exactly this shape:\n{\"articles\":[{\"id\":1,\"headline\":\"...\",\"summary\":\"...\",\"why_it_matters\":\"...\",\"category\":\"LLMs\",\"importance\":4}]}\n\nARTICLES:\n${articlesText}`;\n\nreturn [{ json: { prompt } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1712,
+        240
+      ],
+      "id": "767b41a7-8ddb-438d-a92c-d40c0b1820ab",
+      "name": "Build AI request"
+    },
+    {
+      "parameters": {
+        "sortFieldsUi": {
+          "sortField": [
+            {
+              "fieldName": "published",
+              "order": "descending"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.sort",
+      "typeVersion": 1,
+      "position": [
+        1280,
+        240
+      ],
+      "id": "84fd425d-25e3-48a0-a09d-0b0f6e01a4c3",
+      "name": "Newest first."
+    },
+    {
+      "parameters": {
+        "maxItems": 15
+      },
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        1504,
+        240
+      ],
+      "id": "81f10f0f-a924-419e-bfe5-61dc7d24e0bc",
+      "name": "Top 15"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json);\nconst date = $now.toFormat('d LLLL yyyy').toUpperCase();\n\n// escape text for safe use inside HTML\nconst esc = s => String(s)\n  .replace(/&/g, '&amp;')\n  .replace(/</g, '&lt;')\n  .replace(/>/g, '&gt;');\n\n// ---- WhatsApp / plain text version ----\nconst header = `🤖 *AI NEWS — ${date}*\\n`;\nconst blocks = items.map((a, i) =>\n  `\\n*${i + 1}. ${a.headline}*\\n${a.summary}\\n_Why it matters:_ ${a.why_it_matters}\\n🔗 ${a.source}: ${a.url}\\n`\n);\n\n// keep the message under a safe length by dropping the least important stories\nlet text = header;\nlet used = 0;\nfor (const block of blocks) {\n  if ((text + block).length > 3500) break;\n  text += block;\n  used++;\n}\n\n// ---- Email (HTML) version ----\nconst htmlStories = items.map((a, i) => `\n  <div style=\"margin-bottom:20px\">\n    <h3 style=\"margin:0 0 4px\">${i + 1}. ${esc(a.headline)}</h3>\n    <div style=\"color:#666;font-size:12px\">${esc(a.category)} · ${esc(a.source)}</div>\n    <p style=\"margin:6px 0\">${esc(a.summary)}</p>\n    <p style=\"margin:6px 0\"><em>Why it matters:</em> ${esc(a.why_it_matters)}</p>\n    <a href=\"${esc(a.url)}\">Read the article</a>\n  </div>`).join('');\n\nconst html = `<div style=\"font-family:Arial,sans-serif;max-width:640px\">\n  <h2>🤖 AI News — ${date}</h2>${htmlStories}\n</div>`;\n\nreturn [{ json: {\n  subject: `AI News Digest — ${date}`,\n  text,\n  html,\n  storiesInWhatsApp: used,\n  totalStories: items.length,\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2528,
+        240
+      ],
+      "id": "d7d42c8a-64f2-42fb-9054-bdf5a9bf20fe",
+      "name": "Build digest"
+    },
+    {
+      "parameters": {
+        "fromEmail": "ayush0kd@gmail.com",
+        "toEmail": "ayush0kd@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2752,
+        240
+      ],
+      "id": "8bcfd3d4-bbaa-4490-a8b2-fa0887314dbf",
+      "name": "Email Digest",
+      "webhookId": "d883bec6-f339-450c-8452-8b3f0e8bd5a2",
+      "credentials": {
+        "smtp": {
+          "id": "M03SpMlOESV1ADeE",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "RSS Wired",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS ARS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS TechCrunch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS ARS": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "RSS Verge": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS TechCrunch": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize": {
+      "main": [
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter": {
+      "main": [
+        [
+          {
+            "node": "Dedupe by URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dedupe by URL": {
+      "main": [
+        [
+          {
+            "node": "Newest first.",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build AI request": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Newest first.": {
+      "main": [
+        [
+          {
+            "node": "Top 15",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Top 15": {
+      "main": [
+        [
+          {
+            "node": "Build AI request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Build digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build digest": {
+      "main": [
+        [
+          {
+            "node": "Email Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "8db17eec-5660-432d-a1d9-23f38874d0fa",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6b499e08fdc47ca3cd137c7979a9dfd646f609d88724027acac16298898d8b7b"
+  },
+  "nodeGroups": [],
+  "id": "FWZ4ceOtc8Z9tzdN",
+  "tags": [
+    {
+      "updatedAt": "2026-10-04T03:48:53.465Z",
+      "createdAt": "2026-10-04T03:48:53.465Z",
+      "id": "EsRGZplYm2hTwmap",
+      "name": "Testing"
+    }
+  ]
+}
